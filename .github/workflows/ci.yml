@@ -1,0 +1,53 @@
+# Reusable CI — the mechanical gate (tests + conformance), inherited by every
+# component repo. The CALLER is a one-liner:
+#
+#   # <component>/.github/workflows/ci.yml
+#   on: { push: { branches: [main] }, pull_request: {} }
+#   jobs:
+#     ci:
+#       uses: sciqnt/sq-constitution/.github/workflows/ci.yml@v1
+#       with:
+#         install: "pip install -e ."          # optional override
+#         test: "python -m unittest discover -s tests"   # optional override
+#
+# Defaults suit a standalone sciqnt component (own pyproject + tests/). A repo with
+# a bespoke harness (e.g. the monorepo's ./run_tests.sh) overrides `install`/`test`.
+name: ci
+
+on:
+  workflow_call:
+    inputs:
+      install:
+        description: "Command to install the package + its test deps"
+        type: string
+        default: "pip install -e ."
+      test:
+        description: "Command that runs the tests + conformance"
+        type: string
+        default: "python -m unittest discover -s tests -p 'test_*.py'"
+      python-versions:
+        description: "JSON array of Python versions"
+        type: string
+        default: '["3.11", "3.12", "3.13"]'
+      os:
+        description: "JSON array of runner OSes"
+        type: string
+        default: '["ubuntu-latest", "macos-latest"]'
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.os) }}
+        python: ${{ fromJSON(inputs.python-versions) }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python }}"
+      - name: Install
+        run: ${{ inputs.install }}
+      - name: Test
+        run: ${{ inputs.test }}
