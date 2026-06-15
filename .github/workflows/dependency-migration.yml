@@ -1,0 +1,79 @@
+# Reusable MIGRATION AGENT — turns a dumb dependency bump into a MIGRATED PR. When
+# Renovate opens a "bump sciqnt-contract X→Y" PR (which fails CI on a breaking change),
+# this agent reads the change, MIGRATES the code, runs conformance to green, and pushes
+# to the PR branch (via the sciqnt-bot App token, so CI re-runs) — gated by CI +
+# principle-review + a human merge. The agentic replacement for the monorepo's atomic
+# cross-cutting change. Pull-model: each repo reacts to its own bump (fits federation).
+#
+# ACTIVATES at Phase 2 (sq-contract published + Renovate configured). Needs the
+# CLAUDE_CODE_OAUTH_TOKEN + APP_ID + APP_PRIVATE_KEY org secrets.
+#
+# CALLER (in each component repo):
+#   on: { pull_request: { types: [opened, synchronize] } }
+#   jobs:
+#     migrate:
+#       if: ${{ contains(github.event.pull_request.labels.*.name, 'dependencies') }}
+#       uses: sciqnt/sq-constitution/.github/workflows/dependency-migration.yml@v1
+#       secrets: inherit
+name: dependency-migration
+
+on:
+  workflow_call:
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: { required: true }
+      APP_ID: { required: true }
+      APP_PRIVATE_KEY: { required: true }
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - uses: actions/checkout@v4
+        with:
+          repository: sciqnt/sq-constitution
+          ref: v1
+          path: _constitution
+
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          prompt: |
+            A dependency bump PR (#${{ github.event.pull_request.number }} in
+            ${{ github.repository }}) raised a sciqnt dependency version. Your job is to
+            MIGRATE this repo to the new version — not just leave the bump.
+
+            1. Read the bump: `gh pr diff ${{ github.event.pull_request.number }}` (which
+               dependency, old→new version).
+            2. Read the new version's CHANGELOG / release notes for breaking changes.
+            3. Apply the migration to THIS repo's code so it conforms to the new version.
+            4. Keep it minimal + aligned (constitution at `_constitution/`; money Decimal,
+               facts bitemporal, synthetic fixtures). Commit (DCO) and push to the PR
+               branch — CI + the principle-review agent re-run; a human merges.
+
+            ESCALATE, don't guess: if the change is SEMANTIC/behavioral (a field's meaning
+            shifted, a money-math change) rather than mechanical (a rename), do NOT
+            silently "fix" it — push what's safe, then comment on the PR clearly flagging
+            what needs a human decision and why. Never touch the money-core on a guess.
+          claude_args: |
+            --model claude-opus-4-8
+            --max-turns 40
+            --append-system-prompt "Governed by the sciqnt constitution (_constitution/). The migration must keep CI green (CI verifies). Money Decimal, facts bitemporal, no custody, synthetic fixtures, DCO. State honest gaps (P18). You CANNOT merge or push to a protected branch."

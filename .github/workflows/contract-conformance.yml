@@ -1,0 +1,72 @@
+# Reusable CRATER-STYLE blast-radius check — called by the `sq-contract` repo on a
+# proposed schema change. Runs each downstream's conformance suite against the
+# CANDIDATE contract, surfacing "this PR breaks N connectors" BEFORE merge. The
+# conformance suite is the cross-repo invariant (a unit passes iff it conforms to its
+# targeted contract version).
+#
+# ACTIVATES at Phase 2 (sq-contract published as its own repo/package). Until then the
+# contract + conformance live in the sciqnt/sciqnt monorepo and this is dormant.
+#
+# CALLER (in sq-contract):
+#   on: { pull_request: {} }
+#   jobs:
+#     crater:
+#       uses: sciqnt/sq-constitution/.github/workflows/contract-conformance.yml@v1
+#       with:
+#         downstreams: '["sciqnt/sq-degiro","sciqnt/sq-kalshi","sciqnt/sq-portfolio"]'
+name: contract-conformance
+
+on:
+  workflow_call:
+    inputs:
+      downstreams:
+        description: "JSON array of owner/repo to test against the candidate contract"
+        type: string
+        required: true
+      candidate-ref:
+        description: "The contract ref to test (defaults to the PR head)"
+        type: string
+        default: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  conformance:
+    strategy:
+      fail-fast: false           # test ALL downstreams; report the full blast radius
+      matrix:
+        repo: ${{ fromJSON(inputs.downstreams) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the downstream
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repo }}
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - name: Install the downstream against the CANDIDATE contract
+        run: |
+          pip install -e .
+          # Install the contract at the candidate ref (the proposed change), so the
+          # downstream runs its conformance against what THIS PR would publish:
+          pip install "git+https://github.com/${{ github.repository }}.git@${{ inputs.candidate-ref }}"
+
+      - name: Run the downstream's conformance
+        run: python -m unittest discover -s tests -p 'test_*.py'
+
+  report:
+    needs: conformance
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize the blast radius on the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # `conformance` uses fail-fast:false, so a single broken downstream still
+          # surfaces all results. A maintainer must accompany a breaking contract
+          # change with the downstream migrations (the migration agent fans those out).
+          echo "Conformance result: ${{ needs.conformance.result }}"
+          if [ "${{ needs.conformance.result }}" != "success" ]; then
+            echo "::warning::This contract change breaks ≥1 downstream — ship the migration alongside it."
+          fi
