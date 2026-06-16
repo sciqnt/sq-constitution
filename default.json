@@ -1,0 +1,15 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "sciqnt org Renovate preset. Repos extend it with: { \"extends\": [\"github>sciqnt/sq-constitution\"] }. Detects dependency bumps (esp. sciqnt-contract), labels them `dependencies` so the dependency-migration agent reacts, and keeps merges HUMAN-GATED (automerge off — the principle-review + a person decide).",
+  "extends": ["config:recommended", ":dependencyDashboard"],
+  "labels": ["dependencies"],
+  "automerge": false,
+  "rangeStrategy": "bump",
+  "packageRules": [
+    {
+      "description": "Group sciqnt-* component deps; the migration agent reacts to the `dependencies` label",
+      "matchPackageNames": ["/^sciqnt-/"],
+      "groupName": "sciqnt components"
+    }
+  ]
+}
