@@ -57,14 +57,21 @@ name" convention. Renaming the import would churn every connector for nothing.
        version auto-opens a bump PR. (Template already wires it; activates once
        `sciqnt-schema` is on PyPI.)
 
-## Phase 3 — split the loose leaves
+## Phase 3 — split the loose leaves  ·  DONE (data/compute libs)
 
-Order by lowest coupling to the (now-stabilizing) contract; each is a leaf consumer.
+Done via the publishing bot with **git-ref pins** during the transition (each
+sibling `sciqnt-*` dep resolves from its repo `@v0.1.0`; re-pin to PyPI with
+`--pin pypi` once published). All 10 generated from their in-mono packages,
+verified to install clean in isolation, CI-green, branch-protected:
 
-1. [ ] `sq-math`, `sq-fmt`, `sq-performance`, `sq-secrets`, `sq-price-store`, `sq-fx`,
-       `sq-compute` — for each: create the repo, move its package + tests, pin
-       `sciqnt-contract` where needed, copy the caller workflows, publish to PyPI.
-2. [ ] `sq-tui` (the app), `sq-config`, `sq-agents`.
+1. [x] Tier 0 (no sciqnt deps): `sq-fmt`, `sq-config`, `sq-price-store`.
+2. [x] Tier 1 (→ schema/config/fmt): `sq-compute`, `sq-performance`,
+       `sq-market-data`, `sq-fx`, `sq-secrets`.
+3. [x] Tier 2 (→ tier 1): `sq-analytics`, `sq-aggregator`.
+4. [ ] App layer — `sq-tui`, `sq-agents`, plus `sq-platform`/`sq-skills`/`sq-scaffold`
+       — deferred: heavier coupling + interactive deps; split after the libs settle.
+5. [ ] **Re-pin git-ref → PyPI** across all dependents once the dists are published
+       (`publish_component.py --pin pypi`, then re-ship + re-tag).
 
 ## Phase 4 — build the sync, THEN detonate connectors
 
