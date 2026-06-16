@@ -108,9 +108,15 @@ jobs:
           esac
           body="$(gh pr view "$PR" --repo "$REPO" --json comments \
                   -q '[.comments[] | select(.author.login=="github-actions")] | last | .body' 2>/dev/null || true)"
+          # Auto-merge is best-effort: the VERDICT is the gate's real output, so a
+          # merge hiccup (e.g. a repo without "Allow auto-merge") must NOT fail the
+          # review job — just log and move on.
           if printf '%s' "$body" | grep -q 'VERDICT: ALIGNED'; then
-            gh pr merge "$PR" --repo "$REPO" --auto --squash --delete-branch \
-              && echo "✅ trusted ($perm) + ALIGNED — auto-merge enabled"
+            if gh pr merge "$PR" --repo "$REPO" --auto --squash --delete-branch; then
+              echo "✅ trusted ($perm) + ALIGNED — auto-merge enabled"
+            else
+              echo "::warning::ALIGNED but could not enable auto-merge (is 'Allow auto-merge' on for $REPO?) — left for a human"
+            fi
           else
             gh pr merge "$PR" --repo "$REPO" --disable-auto 2>/dev/null || true
             echo "verdict not ALIGNED — auto-merge disabled; left for a maintainer"
