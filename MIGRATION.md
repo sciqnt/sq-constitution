@@ -34,17 +34,28 @@ Do this entirely inside `sciqnt/sciqnt`; nothing splits yet.
 Already live: `sq-constitution` (`@v1`), `.github` (defaults + workflow-templates),
 `sq-connector-template`. New repos inherit the gates automatically (CI proven green).
 
-## Phase 2 — split the contract (the hub)
+## Phase 2 — split the contract (the hub)  ·  IN PROGRESS
 
-1. [ ] Create `sciqnt/sq-contract`. Move the contract package's code in (it's already
-       isolated from Phase 0). Wire the inherited workflows (copy `caller-templates/`).
-2. [ ] Publish `sciqnt-contract` (PyPI, semver). This is the version everything pins.
-3. [ ] **Virtual-monorepo option** (recommended during transition, cf. k8s
-       publishing-bot): keep the mono authoritative and *publish* `sq-contract` from it
-       (a Python/uv publishing step that guarantees the standalone repo installs
-       clean), so the contract has one source of truth until it fully graduates.
-4. [ ] Add Renovate (the shared preset) to every dependent so a new `sciqnt-contract`
-       version auto-opens a bump PR.
+Naming reconciliation: the hub repo is **`sq-schema`** (not `sq-contract`) — the
+component IS the schema package (`sq_schema` / dist `sciqnt-schema`); "contract hub"
+is its *role*, carried by topics + `manifest.yaml`, per the "role via metadata, not
+name" convention. Renaming the import would churn every connector for nothing.
+
+1. [x] **`sciqnt/sq-schema` created** (public, CI green across the matrix, branch
+       protection mirrors the mono). Generated from the mono's `core/sq_schema` by the
+       publishing bot — NOT a hand-move — so the mono stays authoritative.
+2. [ ] **Publish `sciqnt-schema` to PyPI** — workflow ready (the `release` reusable,
+       OIDC trusted publishing, fires on a GitHub Release). GATED: owner adds the PyPI
+       trusted-publisher mapping (sciqnt/sq-schema, `release.yml`) once, then cut a
+       release. This is the version everything pins.
+3. [x] **Virtual-monorepo publishing bot built** — `sciqnt/sciqnt
+       scripts/publish_component.py` regenerates the standalone tree from the in-mono
+       package AND verifies it installs clean + tests green in an isolated venv (the
+       runbook's flagged "not off-the-shelf" guarantee). `Spec`-driven; add a component
+       = add an entry.
+4. [ ] Add Renovate (the shared preset) to every dependent so a new `sciqnt-schema`
+       version auto-opens a bump PR. (Template already wires it; activates once
+       `sciqnt-schema` is on PyPI.)
 
 ## Phase 3 — split the loose leaves
 
