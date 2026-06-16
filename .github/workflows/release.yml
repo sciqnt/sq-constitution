@@ -1,0 +1,48 @@
+# Reusable RELEASE — build sdist+wheel and publish to PyPI via OIDC TRUSTED
+# PUBLISHING (no API token/secret stored anywhere). Inherited by every component
+# that ships a PyPI distribution. Triggered by a GitHub Release in the caller.
+#
+# ONE-TIME SETUP per distribution (owner, on PyPI): add a "pending publisher" /
+# trusted publisher mapping for the dist → (owner: sciqnt, repo: <repo>,
+# workflow: release.yml). After that, releases publish with zero secrets.
+# Docs: https://docs.pypi.org/trusted-publishers/
+#
+# CALLER (in each component repo):
+#   # <component>/.github/workflows/release.yml
+#   on: { release: { types: [published] } }
+#   jobs:
+#     release:
+#       uses: sciqnt/sq-constitution/.github/workflows/release.yml@v1
+#       permissions:
+#         id-token: write          # REQUIRED at the caller for OIDC
+name: release
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        type: string
+        default: "3.12"
+      repository-url:
+        description: "Override to publish to TestPyPI (https://test.pypi.org/legacy/)"
+        type: string
+        default: ""
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write          # OIDC token for trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Build sdist + wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+      - name: Publish to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: ${{ inputs.repository-url }}
