@@ -68,10 +68,24 @@ verified to install clean in isolation, CI-green, branch-protected:
 2. [x] Tier 1 (→ schema/config/fmt): `sq-compute`, `sq-performance`,
        `sq-market-data`, `sq-fx`, `sq-secrets`.
 3. [x] Tier 2 (→ tier 1): `sq-analytics`, `sq-aggregator`.
-4. [ ] App layer — `sq-tui`, `sq-agents`, plus `sq-platform`/`sq-skills`/`sq-scaffold`
-       — deferred: heavier coupling + interactive deps; split after the libs settle.
+4. [x] **App-layer libs** split — `sq-skills`, `sq-agents`, `sq-scaffold` (CI-green).
+       `sq-tui` + `sq-platform` (+ the `sq-config` config-UI module) are **held in the
+       mono on purpose** — they ARE the app, and become the repurposed `sciqnt/sciqnt`.
 5. [ ] **Re-pin git-ref → PyPI** across all dependents once the dists are published
-       (`publish_component.py --pin pypi`, then re-ship + re-tag).
+       (`publish_component.py --pin pypi`, then re-ship + re-tag). DEFERRED to the end.
+
+## Phase 4b — connectors  ·  DONE
+
+All 13 connectors split from `modules/` into `sciqnt/sq-<x>` (CI-green), via the
+publishing bot's connector path (secrets excluded, sciqnt deps git-ref'd, governance +
+generated `NOTICE.md` overlaid). Reverse-engineered ones (degiro/robinhood/yahoo/
+polymarket) carry the strongest disclaimer. 4 needed test-decoupling (optional-
+integration skips; degiro fixture path made test-relative).
+
+## Remaining to fully empty the mono
+- The **app**: `sq_platform` + `sq_tui` (+ `sq_config` config-UI) → repurpose
+  `sciqnt/sciqnt` as the `sciqnt` umbrella/CLI front door.
+- Then: publish everything to PyPI (claim bare `sciqnt`), re-pin git→pypi.
 
 ## Phase 4 — build the sync, THEN detonate connectors
 
